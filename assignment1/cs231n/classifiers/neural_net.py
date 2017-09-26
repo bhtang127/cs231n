@@ -76,7 +76,9 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    pass
+    h_scores = X.dot(W1) + b1
+    h_value = np.maximum(h_scores, 0)
+    scores = h_value.dot(W2) +b2
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -93,7 +95,11 @@ class TwoLayerNet(object):
     # in the variable loss, which should be a scalar. Use the Softmax           #
     # classifier loss.                                                          #
     #############################################################################
-    pass
+    softmax_s = np.exp(scores)
+    loss = np.sum(np.log(np.sum(softmax_s, axis=1))) - np.trace(scores[:, y])
+    loss /= N
+    loss += reg * (np.sum(W1 * W1) + np.sum(W2 * W2))
+  
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -105,7 +111,44 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    pass
+    C = W2.shape[1]
+    dW2 = np.zeros_like(W2)
+    db2 = np.zeros_like(b2)
+
+    is_correct = np.matrix(y).T == range(C)
+    ones_T = np.ones(N)
+    dW2 -= (h_value.T).dot(is_correct)
+    db2 -= np.asarray((ones_T).dot(is_correct))[0]
+    sum_scores = np.matrix(np.sum(softmax_s, axis=1))
+    dW2 += (h_value.T / sum_scores).dot(softmax_s)
+    db2 += np.asarray((ones_T / sum_scores).dot(softmax_s))[0]
+
+    dW2 /= N
+    db2 /= N
+    dW2 += 2 * reg * W2
+
+    grads['W2'] = dW2
+    grads['b2'] = db2
+
+    H = W1.shape[1]
+
+    back_grad = np.zeros_like(h_value)
+
+    back_grad -= W2[:, y].T
+    back_grad += (softmax_s / np.matrix(sum_scores).T).dot(W2.T)
+
+    db1 = np.zeros_like(b1)
+    dW1 = np.zeros_like(W1)
+
+    db1 += np.sum(back_grad * (h_value > 0), axis=0)
+    dW1 += (X.T).dot(back_grad * (h_value > 0))
+
+    dW1 /= N
+    db1 /= N
+    dW1 += 2 * reg * W1
+
+    grads['W1'] = dW1
+    grads['b1'] = db1
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -149,7 +192,9 @@ class TwoLayerNet(object):
       # TODO: Create a random minibatch of training data and labels, storing  #
       # them in X_batch and y_batch respectively.                             #
       #########################################################################
-      pass
+      mask = np.random.choice(range(num_train), batch_size, replace=True)
+      X_batch = X[mask,:]
+      y_batch = y[mask]
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -164,7 +209,10 @@ class TwoLayerNet(object):
       # using stochastic gradient descent. You'll need to use the gradients   #
       # stored in the grads dictionary defined above.                         #
       #########################################################################
-      pass
+      self.params['W1'] -= learning_rate * grads['W1']
+      self.params['b1'] -= learning_rate * grads['b1'] 
+      self.params['W2'] -= learning_rate * grads['W2']
+      self.params['b2'] -= learning_rate * grads['b2']
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -209,7 +257,8 @@ class TwoLayerNet(object):
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
-    pass
+    scores = np.exp(self.loss(X))
+    y_pred = np.argmax(scores, axis=1)
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
@@ -217,3 +266,143 @@ class TwoLayerNet(object):
     return y_pred
 
 
+class Lasso_Net(TwoLayerNet):
+  def loss(self, X, y=None, reg=0.0):
+
+    # Unpack variables from the params dictionary
+    W1, b1 = self.params['W1'], self.params['b1']
+    W2, b2 = self.params['W2'], self.params['b2']
+    N, D = X.shape
+
+    # Compute the forward pass
+    scores = None
+
+    h_scores = X.dot(W1) + b1
+    h_value = np.maximum(h_scores, 0)
+    scores = h_value.dot(W2) +b2
+    
+    # If the targets are not given then jump out, we're done
+    if y is None:
+      return scores
+
+    # Compute the loss
+    loss = None
+
+    softmax_s = np.exp(np.minimum(scores, 256))
+    loss = np.sum(np.log(np.sum(softmax_s, axis=1))) - np.trace(scores[:, y])
+    loss /= N
+    loss += reg * (np.sum(np.abs(W1)) + np.sum(np.abs(W2)))
+  
+    grads = {}
+
+    C = W2.shape[1]
+    dW2 = np.zeros_like(W2)
+    db2 = np.zeros_like(b2)
+
+    is_correct = np.matrix(y).T == range(C)
+    ones_T = np.ones(N)
+    dW2 -= (h_value.T).dot(is_correct)
+    db2 -= np.asarray((ones_T).dot(is_correct))[0]
+    sum_scores = np.matrix(np.sum(softmax_s, axis=1))
+    dW2 += (h_value.T / sum_scores).dot(softmax_s)
+    db2 += np.asarray((ones_T / sum_scores).dot(softmax_s))[0]
+
+    dW2 /= N
+    db2 /= N
+    dW2 += reg * np.sign(W2)
+
+    grads['W2'] = dW2
+    grads['b2'] = db2
+
+    H = W1.shape[1]
+
+    back_grad = np.zeros_like(h_value)
+
+    back_grad -= W2[:, y].T
+    back_grad += (softmax_s / np.matrix(sum_scores).T).dot(W2.T)
+
+    db1 = np.zeros_like(b1)
+    dW1 = np.zeros_like(W1)
+
+    db1 += np.sum(back_grad * (h_value > 0), axis=0)
+    dW1 += (X.T).dot(back_grad * (h_value > 0))
+
+    dW1 /= N
+    db1 /= N
+    dW1 += reg * np.sign(W1)
+
+    grads['W1'] = dW1
+    grads['b1'] = db1
+
+    return loss, grads 
+
+  def train(self, X, y, X_val, y_val,
+            learning_rate=1e-3, learning_rate_decay=0.95,
+            reg=5e-6, num_iters=100,
+            batch_size=200, verbose=False):
+
+    num_train = X.shape[0]
+    iterations_per_epoch = max(num_train / batch_size, 1)
+
+    # Use SGD to optimize the parameters in self.model
+    loss_history = [np.infty]
+    losses = []
+    train_acc_history = []
+    val_acc_history = []
+
+    for it in xrange(num_iters):
+
+      mask = np.random.choice(range(num_train), batch_size, replace=True)
+      X_batch = X[mask,:]
+      y_batch = y[mask]
+
+      if it > 1 and it % 300 == 0:
+        self.params['W1'] = W1_min
+        self.params['b1'] = b1_min 
+        self.params['W2'] = W2_min
+        self.params['b2'] = b2_min
+
+      # Compute loss and gradients using the current minibatch
+      loss, grads = self.loss(X_batch, y=y_batch, reg=reg)
+      
+      self.params['W1'] -= learning_rate * grads['W1']
+      self.params['b1'] -= learning_rate * grads['b1'] 
+      self.params['W2'] -= learning_rate * grads['W2']
+      self.params['b2'] -= learning_rate * grads['b2']
+
+      if loss <= np.min(loss_history):
+        losses.append(loss)
+        W1_min = self.params['W1']
+        b1_min = self.params['b1']
+        W2_min = self.params['W2']
+        b2_min = self.params['b2']
+      
+      loss_history.append(loss)
+
+      if verbose and it % 300 == 0:
+        print('iteration %d / %d: loss %f' % (it, num_iters, loss))
+
+      # Every epoch, check train and val accuracy and decay learning rate.
+      if it % iterations_per_epoch == 0:
+        # Check accuracy
+        train_acc = (self.predict(X_batch) == y_batch).mean()
+        val_acc = (self.predict(X_val) == y_val).mean()
+        train_acc_history.append(train_acc)
+        val_acc_history.append(val_acc)
+
+        # Decay learning rate
+        learning_rate *= learning_rate_decay
+
+    self.params['W1'] = W1_min
+    self.params['b1'] = b1_min 
+    self.params['W2'] = W2_min
+    self.params['b2'] = b2_min
+
+    loss_history.pop(0)
+
+    return {
+      'losses' : losses,
+      'loss_history': loss_history,
+      'train_acc_history': train_acc_history,
+      'val_acc_history': val_acc_history,
+    } 

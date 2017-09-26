@@ -30,7 +30,21 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  N = X.shape[0]
+  D, C = W.shape
+
+  for i in range(N):
+    scores_i = np.exp(X[i].dot(W))
+    total_score = np.sum(scores_i)
+    loss -= np.log(scores_i[y[i]] / total_score)
+    dW[:, y[i]] -= X[i]
+    for j in range(C):
+      dW[:, j] += X[i] * scores_i[j] / total_score
+
+  loss /= N
+  dW /= N
+  loss += reg * np.sum(W * W)
+  dW += 2 * reg * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -54,7 +68,21 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  N = X.shape[0]
+  D, C = W.shape
+  
+  scores = np.exp(X.dot(W))
+  loss += np.sum(np.log(np.sum(scores, axis=1))) - np.trace(X.dot(W[:, y]))
+  
+  is_correct = np.matrix(y).T == range(C)
+  dW -= (X.T).dot(is_correct)
+  sum_scores = np.matrix(np.sum(scores, axis=1))
+  dW += (X.T / sum_scores).dot(scores)
+
+  loss /= N
+  dW /= N
+  loss += reg * np.sum(W * W)
+  dW += 2 * reg * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
