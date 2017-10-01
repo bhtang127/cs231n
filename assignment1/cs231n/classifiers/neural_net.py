@@ -288,7 +288,7 @@ class Lasso_Net(TwoLayerNet):
     # Compute the loss
     loss = None
 
-    softmax_s = np.exp(np.minimum(scores, 256))
+    softmax_s = np.exp(np.maximum(np.minimum(scores, 256), -256))
     loss = np.sum(np.log(np.sum(softmax_s, axis=1))) - np.trace(scores[:, y])
     loss /= N
     loss += reg * (np.sum(np.abs(W1)) + np.sum(np.abs(W2)))
