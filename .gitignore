@@ -104,3 +104,4 @@ ENV/
 assignment2/output/
 assignment2/cs231n/datasets/cifar-10-batches-py/
 assignment3/cs231n/datasets/coco_captioning/
+assignment3/cs231n/datasets/MNIST_data/
